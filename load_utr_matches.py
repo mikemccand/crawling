@@ -10,10 +10,13 @@ from selenium.webdriver.support.wait import WebDriverWait
 from bs4 import BeautifulSoup
 
 re_whitespace = re.compile(r'\s+')
+re_utr_profile_url = re.compile('.*?/profiles/(\d+)$')
 
 from localconstants import UTR_IDS, UTR_LOGIN_EMAIL, UTR_LOGIN_PASSWORD, UTR_CACHE_DIRECTORY
 
 # TODO
+#   - crawl/load doubles matches too
+#   - why is chromedriver so slow?  it's much faster on Kyra's laptop?
 #   - switch to headless
 #   - run it with a proper UTR login so we get full UTR precision
 #   - record country of each player too, and UTR
@@ -33,14 +36,16 @@ class Match:
 
   def __init__(self,
                match_time,
-               player1_name, player1_utr, player1_set_scores,
-               player2_name, player2_utr, player2_set_scores,
+               player1_name, player1_utr_id, player1_utr, player1_set_scores,
+               player2_name, player2_utr_id, player2_utr, player2_set_scores,
                winner_name):
     self.match_time = match_time
     self.player1_name = player1_name
+    self.player1_utr_id = player1_utr_id
     self.player1_utr = player1_utr
     self.player1_set_scores = player1_set_scores
     self.player2_name = player2_name
+    self.player2_utr_id = player2_utr_id
     self.player2_utr = player2_utr
     self.player2_set_scores = player2_set_scores
     self.winner_name = winner_name
@@ -118,7 +123,9 @@ def parse_profile_html(html):
         raise RuntimeError(f'expected len(scores_by_player) == 2 but got {len(scores_by_player)}')
 
       player1_name = players[0].text
+      player1_utr_id = int(re_utr_profile_url.search(players[0].attrs['href']).group(1))
       player2_name = players[1].text
+      player2_utr_id = int(re_utr_profile_url.search(players[1].attrs['href']).group(1))
 
       player1_set_scores = scores_by_player[0].find_all('div', class_='score-item')
       player2_set_scores = scores_by_player[1].find_all('div', class_='score-item')
@@ -148,8 +155,8 @@ def parse_profile_html(html):
       player2_utr = utrs[1].text
 
       event_instance.add_match(Match(match_time,
-                                     player1_name, player1_utr, player1_set_scores,
-                                     player2_name, player2_utr, player2_set_scores,
+                                     player1_name, player1_utr_id, player1_utr, player1_set_scores,
+                                     player2_name, player1_utr_id, player2_utr, player2_set_scores,
                                      winner_name))
   return all_events
 
@@ -195,6 +202,11 @@ def main():
   walkover_count = 0
   win_count = 0
 
+  queue = {}
+
+  # seed crawler with kids:
+  queue.update(UTR_IDS)
+
   for name, id in UTR_IDS.items():
 
     print(f'\n\n{name} id={id}:')
@@ -204,7 +216,7 @@ def main():
     for event in all_events:
       print(f'\n\nEVENT: {event.name}\n  {event.date}')
       for match in event.matches:
-        print(f'  match: {match.match_time} {match.player1_name} ({match.player1_utr}, set_scores: {match.player1_set_scores}) vs {match.player2_name} ({match.player2_utr} set scores: {match.player2_set_scores})')
+        print(f'  match: {match.match_time} {match.player1_name} ({match.player1_utr_id}, {match.player1_utr}, set_scores: {match.player1_set_scores}) vs {match.player2_name} ({match.player2_utr_id}, {match.player2_utr} set scores: {match.player2_set_scores})')
         print(f'    winner: {match.winner_name}')
         match_count += 1
         if match.player1_name == name:
