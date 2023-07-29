@@ -1,4 +1,7 @@
+import pprint
 import pickle
+import sys
+import time
 import os
 import re
 
@@ -71,7 +74,7 @@ def get_driver():
 
     driver_wait = WebDriverWait(driver, 30)
 
-    driver_wait.until(EC.element_to_be_clickable((By.ID, 'emailInput'))).send_keys(UTR_EMAIL)
+    driver_wait.until(EC.element_to_be_clickable((By.ID, 'emailInput'))).send_keys(UTR_LOGIN_EMAIL)
 
     # passwordInput = wait.until(EC.element_to_be_clickable((By.ID, 'passwordInput')))
 
@@ -156,7 +159,7 @@ def parse_profile_html(html):
 
       event_instance.add_match(Match(match_time,
                                      player1_name, player1_utr_id, player1_utr, player1_set_scores,
-                                     player2_name, player1_utr_id, player2_utr, player2_set_scores,
+                                     player2_name, player2_utr_id, player2_utr, player2_set_scores,
                                      winner_name))
   return all_events
 
@@ -182,6 +185,11 @@ def load_all_events(id):
 
       html = driver.page_source
       open(html_cache_file, 'w', encoding='utf8').write(html)
+
+      print(f'  now rate limit (sleep for 20 seconds)...')
+      time.sleep(20)
+      print(f'  wake up!')
+      
     else:
       print(f'  load from html cache {html_cache_file}')
       html = open(html_cache_file, encoding='utf8').read()
@@ -196,22 +204,67 @@ def load_all_events(id):
 
   return all_events
 
+
+def increment_player(utr_id, name, queue, done):
+  '''
+  Record that we saw this player in a match, incrementing our counter.
+  '''
+  
+  if utr_id in done:
+    return
+
+  if utr_id not in queue:
+    queue[utr_id] = [name, 0]
+
+  queue[utr_id][1] += 1
+
+
 def main():
+
+  pp = pprint.PrettyPrinter(indent=2)
 
   match_count = 0
   walkover_count = 0
   win_count = 0
 
   queue = {}
+  done = set()
 
   # seed crawler with kids:
-  queue.update(UTR_IDS)
+  for name, utr_id in UTR_IDS.items():
+      queue[utr_id] = (name, sys.maxsize)
 
-  for name, id in UTR_IDS.items():
+  while True:
 
-    print(f'\n\n{name} id={id}:')
+    # pick the next utr_id to load as the player we've seen in the most matches, forcing four kids to load first
+    # TODO: switch to some sort of updateable PQ:
 
-    all_events = load_all_events(id)
+    max_match_count = None
+    max_utr_id = None
+
+    print(f'{len(queue)} in queue, {len(done)} done:\n')
+    pp.pprint(queue)    
+
+    for utr_id, (player_name, match_count) in queue.items():
+      if max_match_count is None or match_count > max_match_count:
+        max_match_count = match_count
+        max_utr_id = utr_id
+
+    if max_utr_id is None:
+      # WTF all done!?
+      print('somehow all done?')
+      break
+    
+    utr_id = max_utr_id
+    name, match_count = queue[utr_id]
+    del queue[max_utr_id]
+
+    # put into done now so we don't increment this player again
+    done.add(utr_id)
+
+    print(f'\n\nload: {name} utr_id={utr_id} match_count={match_count}:')
+
+    all_events = load_all_events(utr_id)
 
     for event in all_events:
       print(f'\n\nEVENT: {event.name}\n  {event.date}')
@@ -219,6 +272,10 @@ def main():
         print(f'  match: {match.match_time} {match.player1_name} ({match.player1_utr_id}, {match.player1_utr}, set_scores: {match.player1_set_scores}) vs {match.player2_name} ({match.player2_utr_id}, {match.player2_utr} set scores: {match.player2_set_scores})')
         print(f'    winner: {match.winner_name}')
         match_count += 1
+
+        increment_player(match.player1_utr_id, match.player1_name, queue, done)
+        increment_player(match.player2_utr_id, match.player2_name, queue, done)
+          
         if match.player1_name == name:
           if match.player1_set_scores == 'walkover':
             walkover_count += 1
