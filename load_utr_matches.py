@@ -8,6 +8,7 @@ import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from bs4 import BeautifulSoup
@@ -18,6 +19,8 @@ re_utr_profile_url = re.compile('.*?/profiles/(\d+)$')
 from localconstants import UTR_IDS, UTR_LOGIN_EMAIL, UTR_LOGIN_PASSWORD, UTR_CACHE_DIRECTORY
 
 # TODO
+#   - also parse the UTR W/L and confirm our recalculation matches
+#   - upgrade my python/crhoemdriver
 #   - crawl/load doubles matches too
 #   - why is chromedriver so slow?  it's much faster on Kyra's laptop?
 #   - switch to headless
@@ -69,7 +72,9 @@ def get_driver():
     # options.add_argument("--verbose")
     # options.add_argument("--headless")
 
-    driver = webdriver.Chrome(options=options, executable_path='/usr/local/bin/chromedriver')
+    service = Service(executable_path='/usr/local/bin/chromedriver')
+
+    driver = webdriver.Chrome(service=service, options=options)
     driver.get('https://app.universaltennis.com/login')
 
     driver_wait = WebDriverWait(driver, 30)
@@ -89,6 +94,7 @@ def get_driver():
     print('  done send_keys')
 
     print('now wait for login page to finish/load')
+    time.sleep(15)
     driver_wait.until(EC.presence_of_element_located, (By.ID, 'myutr-app-wrapper'))
 
   return driver
@@ -96,7 +102,7 @@ def get_driver():
 def parse_profile_html(html):
   soup = BeautifulSoup(html, 'html.parser')
 
-  # print(soup)
+  # print(soup.prettify())
 
   all_events = []
 
@@ -115,7 +121,9 @@ def parse_profile_html(html):
 
       #print('\n\n')
       #print(match.prettify())
-      # print(f'  NAME: {name.contents[0]} {name.contents[1]}')
+      #print(f'  NAME: {name.contents[0]} {name.contents[1]}')
+      #print(f'  NAME: {name}')
+      #print(f' DATE: {date}')
 
       players = match.find_all('a', class_='player-name')
       utrs = match.find_all('div', class_='utr-container')
@@ -206,9 +214,9 @@ def load_all_events(id):
 
 
 def increment_player(utr_id, name, queue, done):
-  '''
+  """
   Record that we saw this player in a match, incrementing our counter.
-  '''
+  """
   
   if utr_id in done:
     return
@@ -223,16 +231,47 @@ def main():
 
   pp = pprint.PrettyPrinter(indent=2)
 
-  match_count = 0
-  walkover_count = 0
-  win_count = 0
-
   queue = {}
   done = set()
 
+  # nocommit
+  if False:
+    all_events = load_all_events(243293)
+    name = 'Anya Beniwal'
+
+    match_count = 0
+    walkover_count = 0
+    win_count = 0
+
+    for event in all_events:
+      print(f'\n\nEVENT: {event.name}\n  {event.date}')
+      for match in event.matches:
+        print(f'  match: {match.match_time} {match.player1_name} ({match.player1_utr_id}, {match.player1_utr}, set_scores: {match.player1_set_scores}) vs {match.player2_name} ({match.player2_utr_id}, {match.player2_utr} set scores: {match.player2_set_scores})')
+        print(f'    winner: {match.winner_name}')
+        match_count += 1
+
+        increment_player(match.player1_utr_id, match.player1_name, queue, done)
+        increment_player(match.player2_utr_id, match.player2_name, queue, done)
+
+        if match.player1_name == name:
+          if match.player1_set_scores == 'walkover':
+            walkover_count += 1
+        elif match.player2_name == name:
+          if match.player2_set_scores == 'walkover':
+            walkover_count += 1
+        else:
+          raise RuntimeError(f'saw a match without {name}?')
+
+        if match.winner_name == name:
+          win_count += 1
+
+    print(f'\n{name}: {len(all_events)} events, {match_count} matches ({win_count} wins, {match_count - win_count - walkover_count} losses, {walkover_count} walkovers)')
+    sys.exit(0)
+
   # seed crawler with kids:
   for name, utr_id in UTR_IDS.items():
-      queue[utr_id] = (name, sys.maxsize)
+    queue[utr_id] = (name, sys.maxsize)
+        
 
   while True:
 
@@ -266,6 +305,10 @@ def main():
 
     all_events = load_all_events(utr_id)
 
+    match_count = 0
+    walkover_count = 0
+    win_count = 0
+    
     for event in all_events:
       print(f'\n\nEVENT: {event.name}\n  {event.date}')
       for match in event.matches:
