@@ -16,9 +16,10 @@ from bs4 import BeautifulSoup
 re_whitespace = re.compile(r'\s+')
 re_utr_profile_url = re.compile('.*?/profiles/(\d+)$')
 
-from localconstants import UTR_IDS, UTR_LOGIN_EMAIL, UTR_LOGIN_PASSWORD, UTR_CACHE_DIRECTORY
+from localconstants import UTR_IDS, UTR_LOGIN_EMAIL, UTR_LOGIN_PASSWORD, UTR_CACHE_DIRECTORY, CHROMEDRIVER_PATH
 
 # TODO
+#   - crawl all past years too?
 #   - also parse the UTR W/L and confirm our recalculation matches
 #   - upgrade my python/crhoemdriver
 #   - crawl/load doubles matches too
@@ -72,7 +73,8 @@ def get_driver():
     # options.add_argument("--verbose")
     # options.add_argument("--headless")
 
-    service = Service(executable_path='/usr/local/bin/chromedriver')
+    # service = Service(executable_path='/usr/local/bin/chromedriver')
+    service = Service(executable_path=CHROMEDRIVER_PATH)
 
     driver = webdriver.Chrome(service=service, options=options)
     driver.get('https://app.universaltennis.com/login')
@@ -160,7 +162,11 @@ def parse_profile_html(html):
         if 'Tie' in match_status[0].text:
           winner_name = None
         else:
-          raise RuntimeError(f'could not determine winner: {utrs}')
+          match_status = match.find_all('div', class_='match-status-container')
+          if match_status is not None and len(match_status) == 1 and 'Not Finished' in match.text:
+            winner_name = None
+          else:
+            raise RuntimeError(f'could not determine winner: {utrs}')
 
       player1_utr = utrs[0].text
       player2_utr = utrs[1].text
@@ -190,6 +196,7 @@ def load_all_events(id):
 
       # must wait for AJAX load to fill in actual results
       driver_wait.until(EC.presence_of_element_located, (By.CLASS_NAME, 'eventItem__eventTime__3U8ST'))
+      time.sleep(10)
 
       html = driver.page_source
       open(html_cache_file, 'w', encoding='utf8').write(html)
