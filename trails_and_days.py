@@ -22,7 +22,9 @@ def main():
     # nocommit
     # num_trails = random.randint(10, 300)
 
-    num_trails = rand.randint(10, 301)
+    # nocommit
+    #num_trails = rand.randint(10, 301)
+    num_trails = rand.randint(10, 20)
     for i in range(num_trails):
       trails.append(rand.randint(1, 50))
 
@@ -36,18 +38,19 @@ def main():
     
     print(f'\n{num_trails} trails: {trails}\n')
 
-    #for num_days in range(1, 14):
-
-    if False:
-      print('slow:')
-      t0 = time.time()
-      best_cost, trails_by_day = slow_pack_days(trails, num_days)
-      print_solution(best_cost, trails_by_day, time.time() - t0)
-
     print('graph:')
     t0 = time.time()
     best_cost, trails_by_day = graph_search_pack_days(trails, num_days)
     print_solution(best_cost, trails_by_day, time.time() - t0)
+
+    if True:
+      print('slow:')
+      t0 = time.time()
+      best_cost2, trails_by_day2 = slow_pack_days(trails, num_days)
+      print_solution(best_cost2, trails_by_day2, time.time() - t0)
+      if best_cost2 != best_cost:
+        raise RuntimeError(f'bug in something!  {best_cost} from graph but {best_cost2} from slow-but-correct')
+
 
 
 def print_solution(total_cost, trails_by_day, elapsed_time_sec):
@@ -130,9 +133,11 @@ def graph_search_pack_days(trails, num_days):
         matrix[tup] = (new_cost, node)
         queue.append((new_cost, end_node, new_num_days))
         if tup == end_tup:
-          print('done early!')
-          done = True
-          break
+          # nocommit
+          pass
+          # print('done early!')
+          # done = True
+          # break
 
   # now extract final cost/path
   tup = (end_node, num_days)
