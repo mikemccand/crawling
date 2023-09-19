@@ -22,19 +22,15 @@ def main():
     # nocommit
     # num_trails = random.randint(10, 300)
 
-    num_trails = 25
+    num_trails = rand.randint(10, 301)
     for i in range(num_trails):
-      trails.append(rand.randint(1, 30))
+      trails.append(rand.randint(1, 50))
 
     # pick number of days to pack trails into
-    if False:
-      while True:
-        num_days = random.randint(10, 300)
-        if num_days <= num_trails:
-          break
-
-    # nocommit
-    num_days = 5
+    while True:
+      num_days = random.randint(10, 301)
+      if num_days <= num_trails:
+        break
 
     #pack_days(trails, num_days)
     
@@ -42,10 +38,11 @@ def main():
 
     #for num_days in range(1, 14):
 
-    print('slow:')
-    t0 = time.time()
-    best_cost, trails_by_day = slow_pack_days(trails, num_days)
-    print_solution(best_cost, trails_by_day, time.time() - t0)
+    if False:
+      print('slow:')
+      t0 = time.time()
+      best_cost, trails_by_day = slow_pack_days(trails, num_days)
+      print_solution(best_cost, trails_by_day, time.time() - t0)
 
     print('graph:')
     t0 = time.time()
@@ -102,15 +99,22 @@ def graph_search_pack_days(trails, num_days):
 
   # since graph is finite we don't need to keep a visited -- just keep the queue "frontier" and fully explore it
 
-  # TODO: we could use a priority queue (heapq) here to really do "best first" search, and save some big-oh complexity?
+  seen = set()
+
+  # TODO: use heapq to pursue best-first, and as soon as we hit end tail and num_days, stop
 
   while len(queue) > 0:
 
-    cost_so_far, start_node, num_days_so_far = queue.pop()
+    tup = queue.pop()
+
+    assert tup not in seen, f'saw {tup} again!'
+    seen.add(tup)
+    
+    cost_so_far, node, num_days_so_far = tup
 
     new_num_days = num_days_so_far + 1
 
-    for end_node, cost in enumerate(node_edges[start_node]):
+    for end_node, cost in enumerate(node_edges[node]):
 
       # TODO: optimize a bit, but doesn't alter big-oh:
       if cost is None:
@@ -122,9 +126,8 @@ def graph_search_pack_days(trails, num_days):
 
       # TODO what about ties?
       if tup not in matrix or matrix[tup][0] > new_cost:
-        matrix[tup] = (new_cost, start_node)
-
-      queue.append((new_cost, end_node, new_num_days))
+        matrix[tup] = (new_cost, node)
+        queue.append((new_cost, end_node, new_num_days))
 
   # now extract final cost/path
   tup = (end_node, num_days)
