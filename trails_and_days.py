@@ -1,5 +1,7 @@
 import random
+import heapq
 import copy
+import time
 
 # TODO
 #  - how do ties work?  what about the worst case (all trails same
@@ -8,37 +10,155 @@ import copy
 
 def main():
 
-  # generate random trails
-  trails = []
-  # nocommit
-  # num_trails = random.randint(10, 300)
+  global rand
 
   # fixed seed for debugging
-  rand = random.Random(17)
+  #rand = random.Random(17)
+  rand = random.Random()
 
-  num_trails = 10
-  for i in range(num_trails):
-    trails.append(rand.randint(1, 30))
+  for iter in range(100):
+    # generate random trails
+    trails = []
+    # nocommit
+    # num_trails = random.randint(10, 300)
 
-  # pick number of days to pack trails into
+    num_trails = 25
+    for i in range(num_trails):
+      trails.append(rand.randint(1, 30))
+
+    # pick number of days to pack trails into
+    if False:
+      while True:
+        num_days = random.randint(10, 300)
+        if num_days <= num_trails:
+          break
+
+    # nocommit
+    num_days = 5
+
+    #pack_days(trails, num_days)
+    
+    print(f'\n{num_trails} trails: {trails}\n')
+
+    #for num_days in range(1, 14):
+
+    print('slow:')
+    t0 = time.time()
+    best_cost, trails_by_day = slow_pack_days(trails, num_days)
+    print_solution(best_cost, trails_by_day, time.time() - t0)
+
+    print('graph:')
+    t0 = time.time()
+    best_cost, trails_by_day = graph_search_pack_days(trails, num_days)
+    print_solution(best_cost, trails_by_day, time.time() - t0)
+
+
+def print_solution(total_cost, trails_by_day, elapsed_time_sec):
   if False:
-    while True:
-      num_days = random.randint(10, 300)
-      if num_days <= num_trails:
-        break
-
-  # nocommit
-  num_days = 3
-
-  #pack_days(trails, num_days)
-
-  total_cost, answer = slow_pack_days(trails, num_days)
-
+    l = []
+    for day in answer:
+      l.append(f'({" ".join([str(x) for x in day])})')
+    print(f'{total_cost=:3d} {"".join(l)}')
   l = []
-  for day in answer:
-    l.append(f'({" ".join([str(x) for x in day])})')
-  print(f'{total_cost=} {"".join(l)}')
+  for day in trails_by_day:
+    l.append(" ".join([str(x) for x in day]))
+  num_days = len(trails_by_day)
+  print(f'  {num_days=:2d} {total_cost=:3d}   {":".join(l)} {elapsed_time_sec:6.2f}s')
+  
 
+def graph_search_pack_days(trails, num_days):
+
+  # first pass: enumerate all intervals & their costs into a graph
+
+  # simple 2D array of node to node cost (O(num_trails^2))
+  node_edges = []
+
+  # a node is a point between two trails, including the starting point (start of first trail) and ending point (end of last trail)
+  for node in range(len(trails) + 1):
+    costs = []
+    node_edges.append(costs)
+    
+    for node2 in range(len(trails) + 1):
+      if node < node2:
+        cost = max(trails[node:node2])
+      else:
+        # trails cannot go backwards, ensuring the graph is finite (acyclic)
+        cost = None
+      costs.append(cost)
+
+  # 2nd pass: find shortest path from start node (0) to end node (num_trails), but subject to the requirement that the only paths considered
+  # must be exactly num_paths in length
+
+  queue = []
+
+  # for every pair of nodes (start_node, end_node) AND num_days, stores the
+  # best path to get from start_node to end_node in num_days, with back-pointer
+  # to prior node for recovering the answer path.
+  # maps (end_node, num_days) -> (cost, back_node)
+  matrix = {}
+
+  # base case: cost 0, start node 0, num_days 0
+  queue.append((0, 0, 0))
+
+  # since graph is finite we don't need to keep a visited -- just keep the queue "frontier" and fully explore it
+
+  # TODO: we could use a priority queue (heapq) here to really do "best first" search, and save some big-oh complexity?
+
+  while len(queue) > 0:
+
+    cost_so_far, start_node, num_days_so_far = queue.pop()
+
+    new_num_days = num_days_so_far + 1
+
+    for end_node, cost in enumerate(node_edges[start_node]):
+
+      # TODO: optimize a bit, but doesn't alter big-oh:
+      if cost is None:
+        continue
+
+      new_cost = cost_so_far + cost
+
+      tup = (end_node, new_num_days)
+
+      # TODO what about ties?
+      if tup not in matrix or matrix[tup][0] > new_cost:
+        matrix[tup] = (new_cost, start_node)
+
+      queue.append((new_cost, end_node, new_num_days))
+
+  # now extract final cost/path
+  tup = (end_node, num_days)
+  if tup not in matrix:
+    raise RuntimeError('WTF?')
+
+  cost, back_node = matrix[tup]
+
+  # back_nodes is really day_boundaries
+  back_nodes = [end_node, back_node]
+  back_days = num_days-1
+
+  # backtrace until we get to start node (0)
+  while back_days > 0:
+    tup = (back_node, back_days)
+    back_node = matrix[tup][1]
+    back_nodes.append(back_node)
+    back_days -= 1
+
+  back_nodes.reverse()
+
+  trails_by_day = []
+
+  assert back_nodes[0] == 0
+
+  last_node = 0
+
+  for node in back_nodes[1:]:
+    trails_by_day.append(trails[last_node:node])
+    last_node = node
+  
+  #print(f'best cost: {cost} {back_nodes=}')
+  return cost, trails_by_day
+        
 
 def cost(solution):
   return sum(max(day) for day in solution)
@@ -80,8 +200,14 @@ def slow_pack_days(trails, num_days, trail_upto=0, solution=None):
         return total_cost1, solution1
       elif total_cost1 < total_cost2:
         return total_cost1, solution1
-      else:
+      elif total_cost1 > total_cost2:
         return total_cost2, solution2
+      else:
+        # random!
+        if rand.randint(0, 1) == 0:
+          return total_cost1, solution1
+        else:
+          return total_cost2, solution2
     else:
       # new day not an option -- return same day score
       return total_cost1, solution1
