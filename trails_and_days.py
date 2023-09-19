@@ -8,6 +8,8 @@ import time
 #    length)?  combinatoric number of answers?  hmm, no, because we
 #    only seek the sum(max(trails_across_days)), a single int result
 
+HARD = True
+
 def main():
 
   global rand
@@ -19,12 +21,11 @@ def main():
   for iter in range(100):
     # generate random trails
     trails = []
-    # nocommit
-    # num_trails = random.randint(10, 300)
+    if HARD:
+      num_trails = random.randint(10, 300)
+    else:
+      num_trails = random.randint(10, 20)
 
-    # nocommit
-    #num_trails = rand.randint(10, 301)
-    num_trails = rand.randint(10, 20)
     for i in range(num_trails):
       trails.append(rand.randint(1, 50))
 
@@ -43,7 +44,7 @@ def main():
     best_cost, trails_by_day = graph_search_pack_days(trails, num_days)
     print_solution(best_cost, trails_by_day, time.time() - t0)
 
-    if True:
+    if not HARD:
       print('slow:')
       t0 = time.time()
       best_cost2, trails_by_day2 = slow_pack_days(trails, num_days)
@@ -106,15 +107,16 @@ def graph_search_pack_days(trails, num_days):
 
   # TODO: use heapq to pursue best-first, and as soon as we hit end tail and num_days, stop
 
-  done = False
-
-  end_tup = (num_trails, num_days)
-  
-  while len(queue) > 0 and not done:
+  while len(queue) > 0:
 
     tup = heapq.heappop(queue)
 
     cost_so_far, node, num_days_so_far = tup
+
+    if node == num_trails and num_days_so_far == num_days:
+      print('stop early!')
+      # safe to stop now -- this is the best path
+      break
 
     new_num_days = num_days_so_far + 1
 
@@ -132,12 +134,6 @@ def graph_search_pack_days(trails, num_days):
       if tup not in matrix or matrix[tup][0] > new_cost:
         matrix[tup] = (new_cost, node)
         queue.append((new_cost, end_node, new_num_days))
-        if tup == end_tup:
-          # nocommit
-          pass
-          # print('done early!')
-          # done = True
-          # break
 
   # now extract final cost/path
   tup = (end_node, num_days)
