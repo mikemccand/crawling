@@ -65,6 +65,8 @@ def print_solution(total_cost, trails_by_day, elapsed_time_sec):
 
 def graph_search_pack_days(trails, num_days):
 
+  num_trails = len(trails)
+
   # first pass: enumerate all intervals & their costs into a graph
 
   # simple 2D array of node to node cost (O(num_trails^2))
@@ -99,17 +101,16 @@ def graph_search_pack_days(trails, num_days):
 
   # since graph is finite we don't need to keep a visited -- just keep the queue "frontier" and fully explore it
 
-  seen = set()
-
   # TODO: use heapq to pursue best-first, and as soon as we hit end tail and num_days, stop
 
-  while len(queue) > 0:
+  done = False
 
-    tup = queue.pop()
+  end_tup = (num_trails, num_days)
+  
+  while len(queue) > 0 and not done:
 
-    assert tup not in seen, f'saw {tup} again!'
-    seen.add(tup)
-    
+    tup = heapq.heappop(queue)
+
     cost_so_far, node, num_days_so_far = tup
 
     new_num_days = num_days_so_far + 1
@@ -128,6 +129,10 @@ def graph_search_pack_days(trails, num_days):
       if tup not in matrix or matrix[tup][0] > new_cost:
         matrix[tup] = (new_cost, node)
         queue.append((new_cost, end_node, new_num_days))
+        if tup == end_tup:
+          print('done early!')
+          done = True
+          break
 
   # now extract final cost/path
   tup = (end_node, num_days)
