@@ -9,6 +9,8 @@ import time
 #    only seek the sum(max(trails_across_days)), a single int result
 
 HARD = True
+patrick_top_down_computation = 0
+patrick_bottom_up_computation = 0
 
 def main():
 
@@ -16,9 +18,11 @@ def main():
 
   # fixed seed for debugging
   #rand = random.Random(17)
-  rand = random.Random()
+  seed = random.randint(0, 10000)
+  print(f'seed: {seed}')
+  rand = random.Random(seed)
 
-  for iter in range(100):
+  for iter in range(1000):
     # generate random trails
     trails = []
     if HARD:
@@ -37,12 +41,12 @@ def main():
 
     #pack_days(trails, num_days)
     
-    print(f'\n{num_trails} trails: {trails}\n')
+    # print(f'\n{num_trails} trails: {trails}\n')
 
-    print('graph:')
+    #print('graph:')
     t0 = time.time()
     best_cost, trails_by_day = graph_search_pack_days(trails, num_days)
-    print_solution(best_cost, trails_by_day, time.time() - t0)
+    #print_solution(best_cost, trails_by_day, time.time() - t0)
 
     if not HARD:
       print('slow:')
@@ -52,6 +56,21 @@ def main():
       if best_cost2 != best_cost:
         raise RuntimeError(f'bug in something!  {best_cost} from graph but {best_cost2} from slow-but-correct')
 
+    td_start = time.time()
+    td_res = patrick_top_down(trails, num_days)
+    td_end = time.time()
+    bu_res = patrick_bottom_up(trails, num_days)
+    bu_end = time.time()
+
+    if td_res != best_cost:
+      raise RuntimeError()
+    if bu_res != best_cost:
+      raise RuntimeError()
+
+    print(f'{iter}: {best_cost} {td_res} {bu_res} trails={trails} num_days={num_days}')
+
+    #print("top down result:", td_res, "computation cost: ", patrick_top_down_computation, "time spend:", td_end - td_start)
+    #print("bottom up result:", bu_res, "computation cost:", patrick_bottom_up_computation, "time spend:", bu_end - td_end)
 
 
 def print_solution(total_cost, trails_by_day, elapsed_time_sec):
@@ -114,7 +133,7 @@ def graph_search_pack_days(trails, num_days):
     cost_so_far, node, num_days_so_far = tup
 
     if node == num_trails and num_days_so_far == num_days:
-      print('stop early!')
+      #print('stop early!')
       # safe to stop now -- this is the best path
       break
 
@@ -167,7 +186,6 @@ def graph_search_pack_days(trails, num_days):
   
   #print(f'best cost: {cost} {back_nodes=}')
   return cost, trails_by_day
-        
 
 def cost(solution):
   return sum(max(day) for day in solution)
@@ -390,6 +408,48 @@ def print_full_answer(trails, num_days, matrix):
 
   print(f'score {best_score}: {"".join(l)}')
                  
+def patrick_top_down(trails, ndays):
+
+    memory = [[-1 for _ in range(len(trails))] for _ in range(ndays)]
+    return patrick_best_partition(ndays, trails, 0, memory)
+
+
+def patrick_best_partition(days, trails, start_idx, memory):
+    global patrick_top_down_computation
+    if days < len(memory) and memory[days][start_idx] != -1:
+        return memory[days][start_idx]
+    if days == 1:
+        return max(trails[start_idx:])
+    res = 1 << 31 # int max
+    max_trails = len(trails) - days + 1
+    for end_idx in range(start_idx + 1, max_trails + 1):
+        res = min(res, patrick_best_partition(days - 1, trails, end_idx, memory) + max(trails[start_idx: end_idx]))
+        patrick_top_down_computation += 1
+
+    if days < len(memory):
+        memory[days][start_idx] = res
+        # print(days, start_idx, res)
+    return res
+
+
+def patrick_bottom_up(trails, ndays):
+    global patrick_bottom_up_computation
+    dp = [[-1 for _ in range(len(trails))] for _ in range(ndays)]
+    # meaning of dp[d][t]
+    # in day d, after covering trails[:t + 1], what's the best score so far
+    for d in range(ndays):
+        for t in range(d, len(trails) - ndays + d + 1):
+            if d == 0:
+                dp[d][t] = max(trails[:t + 1])
+            else:
+                res = 1 << 31
+                for i in range(d - 1, t):
+                    res = min(res, dp[d - 1][i] + max(trails[i + 1: t + 1]))
+                    patrick_bottom_up_computation += 1
+                dp[d][t] = res
+            # print(d, t, dp[d][t])
+    return dp[-1][-1]
+
 if __name__ == '__main__':
   main()
-
+  import time
