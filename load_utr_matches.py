@@ -70,6 +70,9 @@ def get_driver():
   if driver is None:
     options = Options()
     options.add_argument("--window-size=1920x1080")
+    options.binary_location = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+    #options.executable_path = '/opt/homebrew/bin/chromedriver'
+    
     # options.add_argument("--verbose")
     # options.add_argument("--headless")
 
@@ -77,6 +80,7 @@ def get_driver():
     service = Service(executable_path=CHROMEDRIVER_PATH)
 
     driver = webdriver.Chrome(service=service, options=options)
+
     driver.get('https://app.universaltennis.com/login')
 
     driver_wait = WebDriverWait(driver, 30)
@@ -91,13 +95,16 @@ def get_driver():
 
     passwordInput.send_keys(UTR_LOGIN_PASSWORD)
     print('  done send_keys')
+    time.sleep(10)
 
     passwordInput.submit()
     print('  done send_keys')
+    time.sleep(10)
 
     print('now wait for login page to finish/load')
     time.sleep(15)
     driver_wait.until(EC.presence_of_element_located, (By.ID, 'myutr-app-wrapper'))
+    time.sleep(10)
 
   return driver
 
@@ -105,10 +112,13 @@ def parse_profile_html(html):
   soup = BeautifulSoup(html, 'html.parser')
 
   # print(soup.prettify())
+  #print(soup)
 
   all_events = []
 
   for event in soup.find_all(class_ = 'eventItem__eventItem__2Xpsd'):
+    #print('\n\n')
+    #print(event.prettify())
     name = re_whitespace.sub(' ', event.find('div', class_='eventItem__eventName__6hntZ').text)
     date = re_whitespace.sub(' ', event.find('div', class_='eventItem__eventTime__3U8ST').text)
     event_instance = Event(name, date)
@@ -241,10 +251,16 @@ def main():
   queue = {}
   done = set()
 
-  # nocommit
-  if False:
-    all_events = load_all_events(243293)
-    name = 'Anya Beniwal'
+  if not os.path.exists(UTR_CACHE_DIRECTORY):
+    os.makedirs(UTR_CACHE_DIRECTORY)
+  
+  for name, id in UTR_IDS.items():
+
+    match_count = 0
+    walkover_count = 0
+    win_count = 0
+
+    print(f'\n\n{name} id={id}:')
 
     match_count = 0
     walkover_count = 0
