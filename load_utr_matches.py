@@ -261,7 +261,7 @@ def main():
     win_count = 0
 
     print(f'\n\n{name} id={id}:')
-
+    all_events = load_all_events(id)
     match_count = 0
     walkover_count = 0
     win_count = 0
@@ -289,8 +289,7 @@ def main():
           win_count += 1
 
     print(f'\n{name}: {len(all_events)} events, {match_count} matches ({win_count} wins, {match_count - win_count - walkover_count} losses, {walkover_count} walkovers)')
-    sys.exit(0)
-
+  sys.exit(0)
   # seed crawler with kids:
   for name, utr_id in UTR_IDS.items():
     queue[utr_id] = (name, sys.maxsize)
